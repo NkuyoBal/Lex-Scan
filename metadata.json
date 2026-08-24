@@ -1,0 +1,6 @@
+{
+  "name": "PDF to Word Multi-Tesseract Studio",
+  "description": "Extractor de texto y maquetador de PDF a Word (.docx) con OCR multi-biblioteca Tesseract (hasta 5 idiomas combinados), detección inteligente de tablas, encabezados e imágenes con edición interactiva y exportación de alta fidelidad.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
