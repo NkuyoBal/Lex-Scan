@@ -220,5 +220,6 @@ export const DEFAULT_TESSERACT_CONFIG = {
   detectImages: true,
   detectHeadings: true,
   useAiRefinement: false,
+  preserveLineBreaks: true,
 };
 

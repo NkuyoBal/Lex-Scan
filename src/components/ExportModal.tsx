@@ -617,6 +617,53 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </div>
               </div>
 
+              {/* Line by line preservation */}
+              <div className="p-3 bg-white border-2 border-[#141414] space-y-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-bold text-[11px] uppercase">Respetar Formato Línea por Línea</div>
+                    <div className="text-[9px] text-[#141414]/70">
+                      Preserva los saltos de línea de cada renglón original del PDF escaneado
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={exportSettings.preserveLineBreaks ?? true}
+                    onChange={(e) => setExportSettings({ ...exportSettings, preserveLineBreaks: e.target.checked })}
+                    className="w-4 h-4 accent-black cursor-pointer"
+                  />
+                </div>
+
+                {exportSettings.preserveLineBreaks !== false && (
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-[#E4E3E0]">
+                    <button
+                      type="button"
+                      onClick={() => setExportSettings({ ...exportSettings, lineBreakMode: 'soft_breaks' })}
+                      className={`p-2 border font-bold text-[9px] uppercase transition text-left ${
+                        exportSettings.lineBreakMode === 'soft_breaks' || !exportSettings.lineBreakMode
+                          ? 'bg-[#141414] text-white border-black'
+                          : 'bg-[#F4F3F0] text-[#141414] border-[#CCCCCC]'
+                      }`}
+                    >
+                      <div>Saltos Suaves (w:br)</div>
+                      <div className="text-[8px] font-normal opacity-80">Mantiene unidad de párrafo con saltos de renglón</div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setExportSettings({ ...exportSettings, lineBreakMode: 'paragraph_lines' })}
+                      className={`p-2 border font-bold text-[9px] uppercase transition text-left ${
+                        exportSettings.lineBreakMode === 'paragraph_lines'
+                          ? 'bg-[#141414] text-white border-black'
+                          : 'bg-[#F4F3F0] text-[#141414] border-[#CCCCCC]'
+                      }`}
+                    >
+                      <div>Renglón por Párrafo (w:p)</div>
+                      <div className="text-[8px] font-normal opacity-80">Cada renglón es un bloque independiente</div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Headers & Footers Toggle */}
               <label className="p-3 bg-white border-2 border-[#141414] flex items-center justify-between cursor-pointer hover:bg-[#E4E3E0]">
                 <div>

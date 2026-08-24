@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Check, Globe, Layers, Table as TableIcon, Heading, ShieldCheck, Sliders, Image as ImageIcon, Sparkles, Zap } from 'lucide-react';
+import { X, Check, Globe, Layers, Table as TableIcon, Heading, ShieldCheck, Sliders, Image as ImageIcon, Sparkles, Zap, AlignLeft } from 'lucide-react';
 import { TesseractEngineConfig } from '../types';
 import { SUPPORTED_LANGUAGES, MULTI_ENGINE_PRESETS } from '../services/languageRegistry';
 
@@ -395,6 +395,25 @@ export const TesseractConfigPanel: React.FC<TesseractConfigPanelProps> = ({
               </div>
 
               <div className="space-y-2">
+                <label className="p-3 bg-white border-2 border-[#141414] flex items-center justify-between cursor-pointer hover:bg-[#E4E3E0]">
+                  <div className="flex items-center space-x-2">
+                    <AlignLeft className="w-4 h-4 text-[#141414]" />
+                    <div>
+                      <div className="font-bold text-[11px] uppercase">Respetar Formato Línea por Línea (Line-by-Line)</div>
+                      <div className="text-[9px] text-[#141414]/70 font-sans">
+                        Conserva los saltos de línea exactos de cada renglón detectado por el OCR
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    id="checkbox-preserve-line-breaks"
+                    type="checkbox"
+                    checked={localConfig.preserveLineBreaks ?? true}
+                    onChange={(e) => setLocalConfig({ ...localConfig, preserveLineBreaks: e.target.checked })}
+                    className="w-4 h-4 accent-black cursor-pointer"
+                  />
+                </label>
+
                 <label className="p-3 bg-white border-2 border-[#141414] flex items-center justify-between cursor-pointer hover:bg-[#E4E3E0]">
                   <div className="flex items-center space-x-2">
                     <TableIcon className="w-4 h-4 text-[#141414]" />

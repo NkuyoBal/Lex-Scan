@@ -235,7 +235,8 @@ export function parseTableLine(line: string): string[] | null {
 export function analyzeDocumentLayout(
   ocrResult: any,
   sourceCanvas: HTMLCanvasElement,
-  detectedImages: Array<{ dataUrl: string; bbox: { x: number; y: number; width: number; height: number } }> = []
+  detectedImages: Array<{ dataUrl: string; bbox: { x: number; y: number; width: number; height: number } }> = [],
+  options: { preserveLineBreaks?: boolean } = { preserveLineBreaks: true }
 ): DocumentElement[] {
   const elements: DocumentElement[] = [];
   const lines: string[] = [];
@@ -383,9 +384,10 @@ export function analyzeDocumentLayout(
       continue;
     }
 
-    // 5. Standard Paragraph (accumulate continuous lines)
+    // 5. Standard Paragraph (accumulate continuous lines with exact line-by-line format)
     let paragraphText = line;
     let j = i + 1;
+    const lineJoiner = options.preserveLineBreaks !== false ? '\n' : ' ';
     while (j < lines.length) {
       const nextLine = lines[j];
       // Break paragraph if next is heading, table, list, or callout
@@ -397,7 +399,7 @@ export function analyzeDocumentLayout(
       ) {
         break;
       }
-      paragraphText += ' ' + nextLine;
+      paragraphText += lineJoiner + nextLine;
       j++;
     }
 
@@ -405,7 +407,7 @@ export function analyzeDocumentLayout(
       id: `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       type: 'paragraph',
       text: sanitizeOcrText(paragraphText),
-      alignment: 'justify',
+      alignment: options.preserveLineBreaks !== false ? 'left' : 'justify',
       confidence: 93,
     });
 
@@ -518,7 +520,8 @@ export async function runMultiTesseractOcr(
   const extractedElements = analyzeDocumentLayout(
     { data: ocrData },
     canvas,
-    []
+    [],
+    { preserveLineBreaks: config.preserveLineBreaks !== false }
   );
 
   onProgress?.({

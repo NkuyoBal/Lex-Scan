@@ -99,6 +99,8 @@ export const DEFAULT_EXPORT_SETTINGS: DocxExportSettings = {
   margins: 'standard',
   includeHeadersFooters: true,
   lineSpacing: '1.15',
+  preserveLineBreaks: true,
+  lineBreakMode: 'soft_breaks',
 };
 
 export const HIGH_EDITABILITY_PRESET: DocxExportSettings = {
@@ -118,6 +120,8 @@ export const HIGH_EDITABILITY_PRESET: DocxExportSettings = {
   margins: 'standard',
   includeHeadersFooters: true,
   lineSpacing: '1.15',
+  preserveLineBreaks: true,
+  lineBreakMode: 'soft_breaks',
 };
 
 // Helper to convert base64 data URL to Uint8Array
@@ -129,6 +133,46 @@ function dataUrlToUint8Array(dataUrl: string): Uint8Array {
     bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes;
+}
+
+// Helper to convert text with newlines (\n) into line-by-line TextRuns with breaks
+function createLineTextRuns(
+  text: string,
+  options: {
+    bold?: boolean;
+    italics?: boolean;
+    size?: number;
+    color?: string;
+    font?: string;
+    preserveLineBreaks?: boolean;
+  }
+): TextRun[] {
+  const content = text ?? '';
+  if (options.preserveLineBreaks === false || !content.includes('\n')) {
+    return [
+      new TextRun({
+        text: content,
+        bold: options.bold,
+        italics: options.italics,
+        size: options.size,
+        color: options.color,
+        font: options.font,
+      }),
+    ];
+  }
+
+  const lines = content.split('\n');
+  return lines.map((line, idx) => {
+    return new TextRun({
+      text: line,
+      break: idx > 0 ? 1 : 0,
+      bold: options.bold,
+      italics: options.italics,
+      size: options.size,
+      color: options.color,
+      font: options.font,
+    });
+  });
 }
 
 // Convert DocumentModel to genuine Microsoft Word Document with custom settings
@@ -180,15 +224,13 @@ export async function exportToDocx(
                   ? AlignmentType.RIGHT
                   : AlignmentType.LEFT,
               spacing: { before: 280, after: 120 },
-              children: [
-                new TextRun({
-                  text: displayText,
-                  bold: true,
-                  size: isHighEditability ? undefined : theme.heading1Size,
-                  color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.primaryColor,
-                  font: isHighEditability ? undefined : theme.fontFamily,
-                }),
-              ],
+              children: createLineTextRuns(displayText, {
+                bold: true,
+                size: isHighEditability ? undefined : theme.heading1Size,
+                color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.primaryColor,
+                font: isHighEditability ? undefined : theme.fontFamily,
+                preserveLineBreaks: settings.preserveLineBreaks,
+              }),
             })
           );
           break;
@@ -211,15 +253,13 @@ export async function exportToDocx(
                   ? AlignmentType.RIGHT
                   : AlignmentType.LEFT,
               spacing: { before: 200, after: 80 },
-              children: [
-                new TextRun({
-                  text: displayText,
-                  bold: true,
-                  size: isHighEditability ? undefined : theme.heading1Size - 4,
-                  color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.secondaryColor,
-                  font: isHighEditability ? undefined : theme.fontFamily,
-                }),
-              ],
+              children: createLineTextRuns(displayText, {
+                bold: true,
+                size: isHighEditability ? undefined : theme.heading1Size - 4,
+                color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.secondaryColor,
+                font: isHighEditability ? undefined : theme.fontFamily,
+                preserveLineBreaks: settings.preserveLineBreaks,
+              }),
             })
           );
           break;
@@ -235,44 +275,71 @@ export async function exportToDocx(
               heading: HeadingLevel.HEADING_3,
               keepNext: settings.keepHeadingsWithNext,
               spacing: { before: 160, after: 60 },
-              children: [
-                new TextRun({
-                  text: displayText,
-                  bold: true,
-                  size: isHighEditability ? undefined : theme.bodySize + 2,
-                  color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.secondaryColor,
-                  font: isHighEditability ? undefined : theme.fontFamily,
-                }),
-              ],
+              children: createLineTextRuns(displayText, {
+                bold: true,
+                size: isHighEditability ? undefined : theme.bodySize + 2,
+                color: isHighEditability && settings.headingStyle === 'standard_native' ? undefined : theme.secondaryColor,
+                font: isHighEditability ? undefined : theme.fontFamily,
+                preserveLineBreaks: settings.preserveLineBreaks,
+              }),
             })
           );
           break;
         }
 
-        case 'paragraph':
-          pageChildren.push(
-            new Paragraph({
-              alignment:
-                el.alignment === 'center'
-                  ? AlignmentType.CENTER
-                  : el.alignment === 'right'
-                  ? AlignmentType.RIGHT
-                  : el.alignment === 'justify'
-                  ? AlignmentType.JUSTIFIED
-                  : AlignmentType.LEFT,
-              spacing: { after: 120, line: lineSpacingDxa },
-              children: [
-                new TextRun({
-                  text: el.text || '',
+        case 'paragraph': {
+          const rawText = el.text || '';
+          if (settings.lineBreakMode === 'paragraph_lines' && rawText.includes('\n')) {
+            // Split into separate paragraph lines
+            const pLines = rawText.split('\n');
+            pLines.forEach((pLine, lIdx) => {
+              pageChildren.push(
+                new Paragraph({
+                  alignment:
+                    el.alignment === 'center'
+                      ? AlignmentType.CENTER
+                      : el.alignment === 'right'
+                      ? AlignmentType.RIGHT
+                      : el.alignment === 'justify'
+                      ? AlignmentType.JUSTIFIED
+                      : AlignmentType.LEFT,
+                  spacing: { after: lIdx === pLines.length - 1 ? 120 : 40, line: lineSpacingDxa },
+                  children: [
+                    new TextRun({
+                      text: pLine,
+                      bold: el.bold,
+                      italics: el.italic,
+                      size: isHighEditability ? 22 : theme.bodySize,
+                      font: isHighEditability ? undefined : theme.fontFamily,
+                    }),
+                  ],
+                })
+              );
+            });
+          } else {
+            pageChildren.push(
+              new Paragraph({
+                alignment:
+                  el.alignment === 'center'
+                    ? AlignmentType.CENTER
+                    : el.alignment === 'right'
+                    ? AlignmentType.RIGHT
+                    : el.alignment === 'justify'
+                    ? AlignmentType.JUSTIFIED
+                    : AlignmentType.LEFT,
+                spacing: { after: 120, line: lineSpacingDxa },
+                children: createLineTextRuns(rawText, {
                   bold: el.bold,
                   italics: el.italic,
                   size: isHighEditability ? 22 : theme.bodySize,
                   font: isHighEditability ? undefined : theme.fontFamily,
+                  preserveLineBreaks: settings.preserveLineBreaks,
                 }),
-              ],
-            })
-          );
+              })
+            );
+          }
           break;
+        }
 
         case 'callout':
           if (isHighEditability) {
@@ -281,14 +348,12 @@ export async function exportToDocx(
               new Paragraph({
                 indent: { left: 720 },
                 spacing: { before: 100, after: 120, line: lineSpacingDxa },
-                children: [
-                  new TextRun({
-                    text: `"${el.text || ''}"`,
-                    italics: true,
-                    size: theme.bodySize,
-                    color: '475569',
-                  }),
-                ],
+                children: createLineTextRuns(`"${el.text || ''}"`, {
+                  italics: true,
+                  size: theme.bodySize,
+                  color: '475569',
+                  preserveLineBreaks: settings.preserveLineBreaks,
+                }),
               })
             );
           } else {
@@ -316,15 +381,13 @@ export async function exportToDocx(
                         },
                         children: [
                           new Paragraph({
-                            children: [
-                              new TextRun({
-                                text: el.text || '',
-                                italics: true,
-                                size: theme.bodySize,
-                                font: theme.fontFamily,
-                                color: theme.primaryColor,
-                              }),
-                            ],
+                            children: createLineTextRuns(el.text || '', {
+                              italics: true,
+                              size: theme.bodySize,
+                              font: theme.fontFamily,
+                              color: theme.primaryColor,
+                              preserveLineBreaks: settings.preserveLineBreaks,
+                            }),
                           }),
                         ],
                       }),
@@ -344,13 +407,11 @@ export async function exportToDocx(
                 new Paragraph({
                   bullet: { level: 0 },
                   spacing: { after: 60 },
-                  children: [
-                    new TextRun({
-                      text: itemText,
-                      size: isHighEditability ? 22 : theme.bodySize,
-                      font: isHighEditability ? undefined : theme.fontFamily,
-                    }),
-                  ],
+                  children: createLineTextRuns(itemText, {
+                    size: isHighEditability ? 22 : theme.bodySize,
+                    font: isHighEditability ? undefined : theme.fontFamily,
+                    preserveLineBreaks: settings.preserveLineBreaks,
+                  }),
                 })
               );
             }
@@ -371,10 +432,10 @@ export async function exportToDocx(
                       size: isHighEditability ? 22 : theme.bodySize,
                       font: isHighEditability ? undefined : theme.fontFamily,
                     }),
-                    new TextRun({
-                      text: itemText,
+                    ...createLineTextRuns(itemText, {
                       size: isHighEditability ? 22 : theme.bodySize,
                       font: isHighEditability ? undefined : theme.fontFamily,
+                      preserveLineBreaks: settings.preserveLineBreaks,
                     }),
                   ],
                 })
@@ -404,15 +465,13 @@ export async function exportToDocx(
                   children: [
                     new Paragraph({
                       alignment: AlignmentType.CENTER,
-                      children: [
-                        new TextRun({
-                          text: headerText,
-                          bold: true,
-                          color: isPlainEditable || isMinimal ? '141414' : 'FFFFFF',
-                          size: theme.bodySize,
-                          font: isHighEditability ? undefined : theme.fontFamily,
-                        }),
-                      ],
+                      children: createLineTextRuns(headerText, {
+                        bold: true,
+                        color: isPlainEditable || isMinimal ? '141414' : 'FFFFFF',
+                        size: theme.bodySize,
+                        font: isHighEditability ? undefined : theme.fontFamily,
+                        preserveLineBreaks: settings.preserveLineBreaks,
+                      }),
                     }),
                   ],
                 })
@@ -438,13 +497,11 @@ export async function exportToDocx(
                     children: [
                       new Paragraph({
                         alignment: isNumeric ? AlignmentType.RIGHT : AlignmentType.LEFT,
-                        children: [
-                          new TextRun({
-                            text: cellText || '',
-                            size: isHighEditability ? 20 : theme.bodySize - 2,
-                            font: isHighEditability ? undefined : theme.fontFamily,
-                          }),
-                        ],
+                        children: createLineTextRuns(cellText || '', {
+                          size: isHighEditability ? 20 : theme.bodySize - 2,
+                          font: isHighEditability ? undefined : theme.fontFamily,
+                          preserveLineBreaks: settings.preserveLineBreaks,
+                        }),
                       }),
                     ],
                   });

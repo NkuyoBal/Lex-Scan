@@ -84,6 +84,7 @@ export interface TesseractEngineConfig {
   detectImages: boolean;
   detectHeadings: boolean;
   useAiRefinement: boolean;
+  preserveLineBreaks: boolean; // Strictly preserve exact line-by-line format from OCR
 }
 
 export interface OcrProgressStatus {
@@ -130,6 +131,8 @@ export interface DocxExportSettings {
   margins: 'standard' | 'narrow' | 'wide';
   includeHeadersFooters: boolean;
   lineSpacing: 'single' | '1.15' | '1.5';
+  preserveLineBreaks: boolean; // Strictly preserve exact line-by-line format in Word .docx
+  lineBreakMode?: 'soft_breaks' | 'paragraph_lines'; // Soft breaks (w:br) or individual paragraph lines
 }
 
 export interface LanguagePreset {

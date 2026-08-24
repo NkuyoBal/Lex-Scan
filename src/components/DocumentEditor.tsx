@@ -325,6 +325,112 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     handleUpdateElement(elId, { listItems: el.listItems.filter((_, idx) => idx !== index) });
   };
 
+  // Split a multi-line paragraph into separate paragraph blocks (exact line-by-line)
+  const handleSplitParagraphLines = (elId: string) => {
+    const elIndex = elements.findIndex((e) => e.id === elId);
+    if (elIndex === -1) return;
+    const el = elements[elIndex];
+    if (!el.text || !el.text.includes('\n')) return;
+
+    const lines = el.text.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length <= 1) return;
+
+    const newElements: DocumentElement[] = lines.map((line) => ({
+      id: `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      type: 'paragraph',
+      text: line,
+      bold: el.bold,
+      italic: el.italic,
+      alignment: el.alignment || 'left',
+      confidence: el.confidence || 93,
+    }));
+
+    const updated = [...elements];
+    updated.splice(elIndex, 1, ...newElements);
+    onUpdateElements(updated);
+    showToast(`✓ Párrafo dividido en ${lines.length} renglones individuales`);
+  };
+
+  // Merge soft-break lines inside a single paragraph into continuous text
+  const handleMergeParagraphLines = (elId: string) => {
+    const el = elements.find((e) => e.id === elId);
+    if (!el || !el.text || !el.text.includes('\n')) return;
+    const mergedText = el.text.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    handleUpdateElement(elId, { text: mergedText });
+    showToast('✓ Renglones unidos en párrafo continuo');
+  };
+
+  // Split all multi-line paragraphs on page into line-by-line blocks
+  const handleSplitAllPageParagraphs = () => {
+    let splitCount = 0;
+    const newElements: DocumentElement[] = [];
+
+    elements.forEach((el) => {
+      if (el.type === 'paragraph' && el.text && el.text.includes('\n')) {
+        const lines = el.text.split('\n').filter((l) => l.trim().length > 0);
+        if (lines.length > 1) {
+          splitCount += lines.length;
+          lines.forEach((line) => {
+            newElements.push({
+              id: `p-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+              type: 'paragraph',
+              text: line,
+              bold: el.bold,
+              italic: el.italic,
+              alignment: el.alignment || 'left',
+              confidence: el.confidence || 93,
+            });
+          });
+          return;
+        }
+      }
+      newElements.push(el);
+    });
+
+    if (splitCount > 0) {
+      onUpdateElements(newElements);
+      showToast(`✓ Documento formateado renglón por renglón (${splitCount} líneas generadas)`);
+    } else {
+      showToast('ℹ Todos los párrafos ya se encuentran separados línea por línea.');
+    }
+  };
+
+  // Merge consecutive single-line paragraphs into fluid blocks
+  const handleMergeAllPageParagraphs = () => {
+    const newElements: DocumentElement[] = [];
+    let currentP: DocumentElement | null = null;
+    let mergedCount = 0;
+
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (el.type === 'paragraph' && el.text) {
+        if (!currentP) {
+          currentP = { ...el, text: el.text.replace(/\n+/g, ' ').trim() };
+        } else {
+          // Join with current
+          currentP.text = `${currentP.text} ${el.text.replace(/\n+/g, ' ').trim()}`;
+          mergedCount++;
+        }
+      } else {
+        if (currentP) {
+          newElements.push(currentP);
+          currentP = null;
+        }
+        newElements.push(el);
+      }
+    }
+    if (currentP) {
+      newElements.push(currentP);
+    }
+
+    if (mergedCount > 0) {
+      onUpdateElements(newElements);
+      showToast(`✓ Renglones unificados en párrafos fluidos (${mergedCount} fusiones)`);
+    } else {
+      showToast('ℹ No hay párrafos consecutivos para unir.');
+    }
+  };
+
   const filteredElements = filterLowConfidence
     ? elements.filter((el) => (el.confidence || 100) < 90)
     : elements;
@@ -350,6 +456,22 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
         {/* Global OCR Correction Tools */}
         <div className="flex items-center space-x-1.5 font-mono text-[11px]">
+          <button
+            onClick={handleSplitAllPageParagraphs}
+            className="px-2 py-1 bg-white hover:bg-[#141414] text-[#141414] hover:text-white border border-[#141414] font-bold uppercase transition cursor-pointer flex items-center space-x-1"
+            title="Separar todos los renglones en bloques de línea individuales"
+          >
+            <Split className="w-3.5 h-3.5" />
+            <span>DIVIDIR EN LÍNEAS</span>
+          </button>
+          <button
+            onClick={handleMergeAllPageParagraphs}
+            className="px-2 py-1 bg-white hover:bg-[#141414] text-[#141414] hover:text-white border border-[#141414] font-bold uppercase transition cursor-pointer flex items-center space-x-1"
+            title="Unir renglones consecutivos en párrafos fluidos"
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>UNIR PÁRRAFOS</span>
+          </button>
           <button
             onClick={handleAutoFixAllPage}
             className="px-2.5 py-1 bg-[#141414] text-white hover:bg-black border border-[#141414] font-bold uppercase transition cursor-pointer flex items-center space-x-1 shadow-[2px_2px_0px_#666666]"
@@ -555,6 +677,41 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         <span>Aa</span>
                       </button>
                     )}
+
+                    {/* Paragraph line tools */}
+                    {el.type === 'paragraph' && el.text && (
+                      <>
+                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 bg-[#E4E3E0] border border-[#141414] text-[#141414]">
+                          {el.text.split('\n').length} {el.text.split('\n').length === 1 ? 'LÍNEA' : 'LÍNEAS'}
+                        </span>
+                        {el.text.includes('\n') && (
+                          <>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSplitParagraphLines(el.id);
+                              }}
+                              className="px-1.5 py-0.5 bg-white hover:bg-[#141414] text-[#141414] hover:text-white border border-[#141414] text-[9px] font-mono font-bold uppercase transition flex items-center space-x-1"
+                              title="Dividir este párrafo en renglones independientes"
+                            >
+                              <Split className="w-2.5 h-2.5" />
+                              <span>DIVIDIR LÍNEAS</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMergeParagraphLines(el.id);
+                              }}
+                              className="px-1.5 py-0.5 bg-white hover:bg-[#141414] text-[#141414] hover:text-white border border-[#141414] text-[9px] font-mono font-bold uppercase transition flex items-center space-x-1"
+                              title="Unir saltos de línea de este párrafo en texto continuo"
+                            >
+                              <Layers className="w-2.5 h-2.5" />
+                              <span>UNIR</span>
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
                   </div>
 
                   {/* Formatting & Reorder Toolbar */}
@@ -738,10 +895,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
                 {el.type === 'paragraph' && (
                   <textarea
-                    rows={3}
+                    rows={Math.max(2, (el.text || '').split('\n').length)}
                     value={el.text || ''}
                     onChange={(e) => handleUpdateElement(el.id, { text: e.target.value })}
-                    className={`w-full bg-[#F5F4F0] border border-[#141414] p-3 text-xs text-[#141414] leading-relaxed focus:outline-hidden focus:bg-white ${
+                    className={`w-full bg-[#F5F4F0] border border-[#141414] p-3 text-xs text-[#141414] font-mono leading-relaxed focus:outline-hidden focus:bg-white resize-y ${
                       el.bold ? 'font-bold' : ''
                     } ${el.italic ? 'italic' : ''} ${
                       el.alignment === 'center'
@@ -752,7 +909,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         ? 'text-justify'
                         : 'text-left'
                     }`}
-                    placeholder="Texto de párrafo extraído..."
+                    placeholder="Texto de párrafo extraído línea por línea..."
                   />
                 )}
 
